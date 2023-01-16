@@ -1,0 +1,14 @@
+{
+  "name": "algomaker",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+    "start": "electron ./app.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "electron": "^22.0.2"
+  }
+}
