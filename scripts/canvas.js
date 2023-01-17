@@ -21,15 +21,47 @@ class Line {
         this.c1 = c1; this.c2 = c2
     }
     draw() {
-        drawLine(this.c1.x, this.c1.y, this.c2.x, this.c2.y)
+        if (this.c1.placement == "TOP" && this.c2.placement == "BOTTOM" && this.c1.y < this.c2.y)
+            drawLine(this.c1.x, this.c1.y, this.c2.x, this.c2.y, "top-bot")
+        else if (this.c1.placement == "BOTTOM" && this.c2.placement == "TOP" && this.c1.y > this.c2.y)
+            drawLine(this.c2.x, this.c2.y, this.c1.x, this.c1.y, "top-bot")
+        else if (this.c1.placement == "LEFT" && this.c2.placement == "TOP" && this.c1.y > this.c2.y)
+            drawLine(this.c1.x, this.c1.y, this.c2.x, this.c2.y, "left-top-up")
+        else if (this.c1.placement == "TOP" && this.c2.placement == "LEFT" && this.c1.y < this.c2.y)
+            drawLine(this.c2.x, this.c2.y, this.c1.x, this.c1.y, "left-top-up")
+        else if (this.c1.placement == "RIGHT" && this.c2.placement == "TOP" && this.c1.y > this.c2.y)
+            drawLine(this.c1.x, this.c1.y, this.c2.x, this.c2.y, "right-top-up")
+        else if (this.c1.placement == "TOP" && this.c2.placement == "RIGHT" && this.c1.y < this.c2.y)
+            drawLine(this.c2.x, this.c2.y, this.c1.x, this.c1.y, "right-top-up")
+        else if (this.c1.placement == "RIGHT" && this.c2.placement == "TOP" && this.c1.x < this.c2.x)
+            drawLine(this.c2.x, this.c2.y, this.c1.x, this.c1.y, "side-top-down")
+        else if (this.c1.placement == "TOP" && this.c2.placement == "RIGHT" && this.c1.x > this.c2.x)
+            drawLine(this.c1.x, this.c1.y, this.c2.x, this.c2.y, "side-top-down")
+        else if (this.c1.placement == "LEFT" && this.c2.placement == "TOP" && this.c1.x > this.c2.x)
+            drawLine(this.c2.x, this.c2.y, this.c1.x, this.c1.y, "side-top-down")
+        else if (this.c1.placement == "TOP" && this.c2.placement == "LEFT" && this.c1.x < this.c2.x)
+            drawLine(this.c1.x, this.c1.y, this.c2.x, this.c2.y, "side-top-down")
+        else
+            drawLine(this.c1.x, this.c1.y, this.c2.x, this.c2.y)
     }
 }
 
 class Connection {
     RADIUS = 3
-    constructor(x, y, type) {
+    constructor(x, y, type, parent) {
         this.x = x; this.y = y;
         this.type = type;
+        this.parent = parent
+
+        this.placement = undefined
+        if (this.y == this.parent.y) this.placement = "TOP"
+        if (this.x == this.parent.x) this.placement = "LEFT"
+        if (this.y == this.parent.y + this.parent.height) this.placement = "BOTTOM"
+        if (this.x == this.parent.x + this.parent.width) this.placement = "RIGHT"
+
+        /**
+         * Events
+         */
         document.addEventListener("mousemove", e => {
             let mouseX = e.clientX - RECT.left, mouseY = e.clientY - RECT.top
             if (getDistance(mouseX, mouseY, this.x, this.y) > this.RADIUS) {
@@ -55,6 +87,7 @@ class Connection {
             tempLine = null
             let mouseX = e.clientX - RECT.left, mouseY = e.clientY - RECT.top
             if (getDistance(mouseX, mouseY, this.x, this.y) <= this.RADIUS) {
+                if (connFrom.type == this.type || connFrom.parent == this.parent) return
                 new Line(connFrom, this)
             }
             document.removeEventListener("mousemove", listener, false)
@@ -87,16 +120,16 @@ class NODE {
 
         this.connections = []
         if (type == "start") this.connections = [
-            new Connection((this.x * 2 + this.width) / 2, this.y + this.height, "output")]
+            new Connection((this.x * 2 + this.width) / 2, this.y + this.height, "output", this)]
         if (type == "stop") this.connections = [
-            new Connection((this.x * 2 + this.width) / 2, this.y, "input")]
+            new Connection((this.x * 2 + this.width) / 2, this.y, "input", this)]
         if (type == "calc" || type == "text") this.connections = [
-            new Connection((this.x * 2 + this.width) / 2, this.y + this.height, "output"),
-            new Connection((this.x * 2 + this.width) / 2, this.y, "input")]
+            new Connection((this.x * 2 + this.width) / 2, this.y + this.height, "output", this),
+            new Connection((this.x * 2 + this.width) / 2, this.y, "input", this)]
         if (type == "logic") this.connections = [
-            new Connection((this.x * 2 + this.width) / 2, this.y, "input"),
-            new Connection(this.x, (this.y * 2 + this.height) / 2, "output"),
-            new Connection(this.x + this.width, (this.y * 2 + this.height) / 2, "output")]
+            new Connection((this.x * 2 + this.width) / 2, this.y, "input", this),
+            new Connection(this.x, (this.y * 2 + this.height) / 2, "output", this),
+            new Connection(this.x + this.width, (this.y * 2 + this.height) / 2, "output", this)]
 
         /**
          * Draging Handler
@@ -213,11 +246,53 @@ function drawStartStopNode(x, y, text = "START") {
     ctx.fillText(text, x + ((txtWidth + PADDING) / 2), y + ((txtHeight + PADDING) / 2))
 }
 
-function drawLine(x1, y1, x2, y2) {
-    ctx.beginPath();
-    ctx.moveTo(x1, y1)
-    ctx.lineTo(x1, (y1 + y2) / 2)
-    ctx.lineTo(x2, (y1 + y2) / 2)
-    ctx.lineTo(x2, y2)
-    ctx.stroke();
+function drawLine(x1, y1, x2, y2, type = "default") {
+    const DISTUP = 20
+    const DISTSIDE = 30
+    switch (type) {
+        case "top-bot":
+            ctx.beginPath();
+            ctx.moveTo(x1, y1)
+            ctx.lineTo(x1, y1 - DISTUP)
+            ctx.lineTo((x1 + x2) / 2, y1 - DISTUP)
+            ctx.lineTo((x1 + x2) / 2, y2 + DISTUP)
+            ctx.lineTo(x2, y2 + DISTUP)
+            ctx.lineTo(x2, y2)
+            ctx.stroke();
+            break
+        case "left-top-up":
+            ctx.beginPath();
+            ctx.moveTo(x1, y1)
+            ctx.lineTo(x1 - DISTSIDE, y1)
+            ctx.lineTo(x1 - DISTSIDE, y2 - DISTUP)
+            ctx.lineTo(x2, y2 - DISTUP)
+            ctx.lineTo(x2, y2)
+            ctx.stroke();
+            break
+        case "right-top-up":
+            ctx.beginPath();
+            ctx.moveTo(x1, y1)
+            ctx.lineTo(x1 + DISTSIDE, y1)
+            ctx.lineTo(x1 + DISTSIDE, y2 - DISTUP)
+            ctx.lineTo(x2, y2 - DISTUP)
+            ctx.lineTo(x2, y2)
+            ctx.stroke();
+            break
+        case "side-top-down":
+            ctx.beginPath();
+            ctx.moveTo(x1, y1)
+            ctx.lineTo(x1, y2)
+            ctx.lineTo(x2, y2)
+            ctx.stroke();
+            break
+        default:
+            ctx.beginPath();
+            ctx.moveTo(x1, y1)
+            ctx.lineTo(x1, (y1 + y2) / 2)
+            ctx.lineTo(x2, (y1 + y2) / 2)
+            ctx.lineTo(x2, y2)
+            ctx.stroke();
+            break
+    }
+
 }
