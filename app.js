@@ -1,4 +1,5 @@
 const { app, BrowserWindow } = require('electron')
+const contextMenu = require('electron-context-menu');
 
 const createWindow = () => {
     const mainWindow = new BrowserWindow({

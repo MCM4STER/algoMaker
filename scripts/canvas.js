@@ -2,6 +2,12 @@ Array.prototype.moveToStart = function (ele) {
     this.splice(this.findIndex(e => e == ele), 1)
     this.unshift(ele)
 }
+Array.prototype.remove = function (ele) {
+    const index = this.indexOf(ele);
+    if (index > -1) {
+        this.splice(index, 1)
+    }
+}
 
 const CANVAS = document.getElementById("canvas")
 const RECT = CANVAS.getBoundingClientRect();
@@ -14,35 +20,49 @@ const LINES = []
 let tempLine = null
 let currentDrag = null
 let connFrom = null
+let edit
 
 class Line {
     constructor(c1, c2) {
         LINES.push(this)
-        this.c1 = c1; this.c2 = c2
+
+        this.c1 = c1.type == "output" ? c1 : c2;
+        this.c2 = c2.type == "input" ? c2 : c1
+        c1.lines.push(this)
+        c2.lines.push(this)
+
+        this.PATH2D
+        document.addEventListener("contextmenu", e => {
+            let mouseX = e.clientX - RECT.left, mouseY = e.clientY - RECT.top
+            if (ctx.isPointInPath(this.PATH2D, mouseX, mouseY)) {
+                LINES.remove(this)
+                delete this
+            }
+        })
     }
     draw() {
         if (this.c1.placement == "TOP" && this.c2.placement == "BOTTOM" && this.c1.y < this.c2.y)
-            drawLine(this.c1.x, this.c1.y, this.c2.x, this.c2.y, "top-bot")
+            this.PATH2D = drawLine(this.c1.x, this.c1.y, this.c2.x, this.c2.y, "top-bot")
         else if (this.c1.placement == "BOTTOM" && this.c2.placement == "TOP" && this.c1.y > this.c2.y)
-            drawLine(this.c2.x, this.c2.y, this.c1.x, this.c1.y, "top-bot")
+            this.PATH2D = drawLine(this.c2.x, this.c2.y, this.c1.x, this.c1.y, "top-bot")
         else if (this.c1.placement == "LEFT" && this.c2.placement == "TOP" && this.c1.y > this.c2.y)
-            drawLine(this.c1.x, this.c1.y, this.c2.x, this.c2.y, "left-top-up")
+            this.PATH2D = drawLine(this.c1.x, this.c1.y, this.c2.x, this.c2.y, "left-top-up")
         else if (this.c1.placement == "TOP" && this.c2.placement == "LEFT" && this.c1.y < this.c2.y)
-            drawLine(this.c2.x, this.c2.y, this.c1.x, this.c1.y, "left-top-up")
+            this.PATH2D = drawLine(this.c2.x, this.c2.y, this.c1.x, this.c1.y, "left-top-up")
         else if (this.c1.placement == "RIGHT" && this.c2.placement == "TOP" && this.c1.y > this.c2.y)
-            drawLine(this.c1.x, this.c1.y, this.c2.x, this.c2.y, "right-top-up")
+            this.PATH2D = drawLine(this.c1.x, this.c1.y, this.c2.x, this.c2.y, "right-top-up")
         else if (this.c1.placement == "TOP" && this.c2.placement == "RIGHT" && this.c1.y < this.c2.y)
-            drawLine(this.c2.x, this.c2.y, this.c1.x, this.c1.y, "right-top-up")
+            this.PATH2D = drawLine(this.c2.x, this.c2.y, this.c1.x, this.c1.y, "right-top-up")
         else if (this.c1.placement == "RIGHT" && this.c2.placement == "TOP" && this.c1.x < this.c2.x)
-            drawLine(this.c2.x, this.c2.y, this.c1.x, this.c1.y, "side-top-down")
+            this.PATH2D = drawLine(this.c2.x, this.c2.y, this.c1.x, this.c1.y, "side-top-down")
         else if (this.c1.placement == "TOP" && this.c2.placement == "RIGHT" && this.c1.x > this.c2.x)
-            drawLine(this.c1.x, this.c1.y, this.c2.x, this.c2.y, "side-top-down")
+            this.PATH2D = drawLine(this.c1.x, this.c1.y, this.c2.x, this.c2.y, "side-top-down")
         else if (this.c1.placement == "LEFT" && this.c2.placement == "TOP" && this.c1.x > this.c2.x)
-            drawLine(this.c2.x, this.c2.y, this.c1.x, this.c1.y, "side-top-down")
+            this.PATH2D = drawLine(this.c2.x, this.c2.y, this.c1.x, this.c1.y, "side-top-down")
         else if (this.c1.placement == "TOP" && this.c2.placement == "LEFT" && this.c1.x < this.c2.x)
-            drawLine(this.c1.x, this.c1.y, this.c2.x, this.c2.y, "side-top-down")
+            this.PATH2D = drawLine(this.c1.x, this.c1.y, this.c2.x, this.c2.y, "side-top-down")
         else
-            drawLine(this.c1.x, this.c1.y, this.c2.x, this.c2.y)
+            this.PATH2D = drawLine(this.c1.x, this.c1.y, this.c2.x, this.c2.y)
     }
 }
 
@@ -52,6 +72,7 @@ class Connection {
         this.x = x; this.y = y;
         this.type = type;
         this.parent = parent
+        this.lines = []
 
         this.placement = undefined
         if (this.y == this.parent.y) this.placement = "TOP"
@@ -79,6 +100,13 @@ class Connection {
         document.addEventListener("mousedown", e => {
             let mouseX = e.clientX - RECT.left, mouseY = e.clientY - RECT.top
             if (getDistance(mouseX, mouseY, this.x, this.y) <= this.RADIUS) {
+                if (!!connFrom && !!tempLine) {
+                    if (connFrom.type == this.type || connFrom.parent == this.parent) return
+                    new Line(connFrom, this)
+                    connFrom = null
+                    document.removeEventListener("mousemove", listener, false)
+                    return
+                }
                 connFrom = this
                 document.addEventListener("mousemove", listener, false)
             }
@@ -132,10 +160,40 @@ class NODE {
             new Connection(this.x + this.width, (this.y * 2 + this.height) / 2, "output", this)]
 
         /**
-         * Draging Handler
+         * Event Handlers
          */
+        document.addEventListener("contextmenu", e => {
+            let mouseX = e.clientX - RECT.left, mouseY = e.clientY - RECT.top
+            if (mouseX >= this.x && mouseY >= this.y && mouseX <= this.x + this.width && mouseY <= this.y + this.height) {
+                this.connections.forEach(c => {
+                    c.lines.forEach(l => {
+                        LINES.remove(l)
+                    })
+                });
+                NODES.remove(this)
+                delete this
+            }
+        })
+        document.addEventListener("dblclick", e => {
+            let mouseX = e.clientX - RECT.left, mouseY = e.clientY - RECT.top
+            if (mouseX >= this.x && mouseY >= this.y && mouseX <= this.x + this.width && mouseY <= this.y + this.height) {
+                if (this.type == "start" || this.type == "stop") return
+                edit = document.createElement("input")
+                edit.classList.add("edit")
+                edit.style.top = this.y + PADDING / 2 - 5 + "px"
+                edit.style.left = this.x + PADDING / 2 - 5 + "px"
+                edit.style.width = this.width - PADDING + "px"
+                edit.addEventListener("focusout", e => {
+                    this.updateText(!!edit.value ? edit.value : this.text);
+                    document.getElementsByClassName("edit")[0].remove()
+                })
+                document.body.appendChild(edit)
+                edit.focus()
+            }
+        })
         const listener = e => {
             if (currentDrag !== this) return;
+            if (!!document.getElementsByClassName("edit")[0]) document.getElementsByClassName("edit")[0].remove()
             this.x += e.movementX
             this.y += e.movementY
             this.connections.forEach(connection => { connection.x += e.movementX; connection.y += e.movementY })
@@ -150,6 +208,12 @@ class NODE {
         document.addEventListener("mouseup", e => {
             document.removeEventListener("mousemove", listener, false)
         })
+    }
+
+    updateText(text) {
+        this.text = text
+        const txtWidth = ctx.measureText(text).width > 50 ? ctx.measureText(text).width : 50
+        this.width = txtWidth + PADDING;
     }
 
     draw() {
@@ -169,10 +233,25 @@ new NODE("calc", 100, 200, "a+=6")
 new NODE("logic", 100, 250, "a==5")
 new NODE("stop", 100, 350)
 
+let GmouseX, GmouseY
+document.addEventListener("mousemove", e => {
+    GmouseX = e.clientX - RECT.left
+    GmouseY = e.clientY - RECT.top
+})
+document.addEventListener("keypress", e => {
+    switch (e.key) {
+        case "1": new NODE("start", GmouseX, GmouseY); break
+        case "2": new NODE("text", GmouseX, GmouseY, "TEXT"); break
+        case "3": new NODE("calc", GmouseX, GmouseY, "CALCULATIONS"); break
+        case "4": new NODE("logic", GmouseX, GmouseY, "LOGIC"); break
+        case "5": new NODE("stop", GmouseX, GmouseY); break
+    }
+})
+
 /**
  * MAIN LOOP
  */
-const FPS = 30;
+const FPS = 120;
 setInterval(() => {
     ctx.clearRect(0, 0, CANVAS.width, CANVAS.height);
     NODES.forEach(e => e.draw())
@@ -231,6 +310,8 @@ function drawLogicNode(x, y, text) {
     ctx.stroke();
     ctx.fillStyle = "black"
     ctx.fillText(text, x + ((txtWidth + PADDING) / 2), y + ((txtHeight + PADDING) / 2))
+    ctx.fillText("T", x, y + ((txtHeight + PADDING) / 2) - 10)
+    ctx.fillText("N", x + txtWidth + PADDING, y + ((txtHeight + PADDING) / 2 - 10))
 }
 
 function drawStartStopNode(x, y, text = "START") {
@@ -249,50 +330,42 @@ function drawStartStopNode(x, y, text = "START") {
 function drawLine(x1, y1, x2, y2, type = "default") {
     const DISTUP = 20
     const DISTSIDE = 30
+    const PATH2D = new Path2D()
     switch (type) {
         case "top-bot":
-            ctx.beginPath();
-            ctx.moveTo(x1, y1)
-            ctx.lineTo(x1, y1 - DISTUP)
-            ctx.lineTo((x1 + x2) / 2, y1 - DISTUP)
-            ctx.lineTo((x1 + x2) / 2, y2 + DISTUP)
-            ctx.lineTo(x2, y2 + DISTUP)
-            ctx.lineTo(x2, y2)
-            ctx.stroke();
+            PATH2D.moveTo(x1, y1)
+            PATH2D.lineTo(x1, y1 - DISTUP)
+            PATH2D.lineTo((x1 + x2) / 2, y1 - DISTUP)
+            PATH2D.lineTo((x1 + x2) / 2, y2 + DISTUP)
+            PATH2D.lineTo(x2, y2 + DISTUP)
+            PATH2D.lineTo(x2, y2)
             break
         case "left-top-up":
-            ctx.beginPath();
-            ctx.moveTo(x1, y1)
-            ctx.lineTo(x1 - DISTSIDE, y1)
-            ctx.lineTo(x1 - DISTSIDE, y2 - DISTUP)
-            ctx.lineTo(x2, y2 - DISTUP)
-            ctx.lineTo(x2, y2)
-            ctx.stroke();
+            PATH2D.moveTo(x1, y1)
+            PATH2D.lineTo(x1 - DISTSIDE, y1)
+            PATH2D.lineTo(x1 - DISTSIDE, y2 - DISTUP)
+            PATH2D.lineTo(x2, y2 - DISTUP)
+            PATH2D.lineTo(x2, y2)
             break
         case "right-top-up":
-            ctx.beginPath();
-            ctx.moveTo(x1, y1)
-            ctx.lineTo(x1 + DISTSIDE, y1)
-            ctx.lineTo(x1 + DISTSIDE, y2 - DISTUP)
-            ctx.lineTo(x2, y2 - DISTUP)
-            ctx.lineTo(x2, y2)
-            ctx.stroke();
+            PATH2D.moveTo(x1, y1)
+            PATH2D.lineTo(x1 + DISTSIDE, y1)
+            PATH2D.lineTo(x1 + DISTSIDE, y2 - DISTUP)
+            PATH2D.lineTo(x2, y2 - DISTUP)
+            PATH2D.lineTo(x2, y2)
             break
         case "side-top-down":
-            ctx.beginPath();
-            ctx.moveTo(x1, y1)
-            ctx.lineTo(x1, y2)
-            ctx.lineTo(x2, y2)
-            ctx.stroke();
+            PATH2D.moveTo(x1, y1)
+            PATH2D.lineTo(x1, y2)
+            PATH2D.lineTo(x2, y2)
             break
         default:
-            ctx.beginPath();
-            ctx.moveTo(x1, y1)
-            ctx.lineTo(x1, (y1 + y2) / 2)
-            ctx.lineTo(x2, (y1 + y2) / 2)
-            ctx.lineTo(x2, y2)
-            ctx.stroke();
+            PATH2D.moveTo(x1, y1)
+            PATH2D.lineTo(x1, (y1 + y2) / 2)
+            PATH2D.lineTo(x2, (y1 + y2) / 2)
+            PATH2D.lineTo(x2, y2)
             break
     }
-
+    ctx.stroke(PATH2D);
+    return PATH2D
 }
