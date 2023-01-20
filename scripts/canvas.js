@@ -73,6 +73,7 @@ class Connection {
         this.type = type;
         this.parent = parent
         this.lines = []
+        this.PATH2D = new Path2D()
 
         this.placement = undefined
         if (this.y == this.parent.y) this.placement = "TOP"
@@ -85,7 +86,7 @@ class Connection {
          */
         document.addEventListener("mousemove", e => {
             let mouseX = e.clientX - RECT.left, mouseY = e.clientY - RECT.top
-            if (getDistance(mouseX, mouseY, this.x, this.y) > this.RADIUS) {
+            if (!ctx.isPointInPath(this.PATH2D, mouseX, mouseY)) {
                 this.RADIUS = 3
                 return
             }
@@ -99,7 +100,7 @@ class Connection {
         }
         document.addEventListener("mousedown", e => {
             let mouseX = e.clientX - RECT.left, mouseY = e.clientY - RECT.top
-            if (getDistance(mouseX, mouseY, this.x, this.y) <= this.RADIUS) {
+            if (ctx.isPointInPath(this.PATH2D, mouseX, mouseY)) {
                 if (!!connFrom && !!tempLine) {
                     if (connFrom.type == this.type || connFrom.parent == this.parent) return
                     new Line(connFrom, this)
@@ -121,13 +122,28 @@ class Connection {
             document.removeEventListener("mousemove", listener, false)
         })
     }
+
+    update() {
+        switch (this.placement) {
+            case "BOTTOM":
+                this.y = this.parent.y + this.parent.height
+            case "TOP":
+                this.x = this.parent.xCenter
+                break
+            case "RIGHT":
+                this.x = this.parent.x + this.parent.width
+            case "LEFT":
+                this.y = (this.parent.y * 2 + this.parent.height) / 2
+                break
+        }
+    }
+
     draw() {
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.RADIUS, 0, 2 * Math.PI)
+        this.PATH2D = new Path2D()
+        this.PATH2D.arc(this.x, this.y, this.RADIUS, 0, 2 * Math.PI)
         ctx.fillStyle = 'white'
-        ctx.fill()
-        ctx.stroke()
-        ctx.strokeStyle = 'black'
+        ctx.fill(this.PATH2D)
+        ctx.stroke(this.PATH2D)
     }
 }
 class NODE {
@@ -144,27 +160,23 @@ class NODE {
         this.type = type
 
         const txtWidth = ctx.measureText(text).width > 50 ? ctx.measureText(text).width : 50
-        this.width = txtWidth + PADDING; this.height = TXTHEIGHT + PADDING;
+        this.width = txtWidth + PADDING;
+        this.height = TXTHEIGHT + PADDING;
+
+        this.xCenter = (this.x * 2 + this.width) / 2
+        this.yCenter = (this.y * 2 + this.height) / 2
+
+        this.PATH2D = new Path2D()
 
         this.connections = []
-        if (type == "start") this.connections = [
-            new Connection((this.x * 2 + this.width) / 2, this.y + this.height, "output", this)]
-        if (type == "stop") this.connections = [
-            new Connection((this.x * 2 + this.width) / 2, this.y, "input", this)]
-        if (type == "calc" || type == "text") this.connections = [
-            new Connection((this.x * 2 + this.width) / 2, this.y + this.height, "output", this),
-            new Connection((this.x * 2 + this.width) / 2, this.y, "input", this)]
-        if (type == "logic") this.connections = [
-            new Connection((this.x * 2 + this.width) / 2, this.y, "input", this),
-            new Connection(this.x, (this.y * 2 + this.height) / 2, "output", this),
-            new Connection(this.x + this.width, (this.y * 2 + this.height) / 2, "output", this)]
+        this.resetConnections()
 
         /**
          * Event Handlers
          */
         document.addEventListener("contextmenu", e => {
             let mouseX = e.clientX - RECT.left, mouseY = e.clientY - RECT.top
-            if (mouseX >= this.x && mouseY >= this.y && mouseX <= this.x + this.width && mouseY <= this.y + this.height) {
+            if (ctx.isPointInPath(this.PATH2D, mouseX, mouseY)) {
                 this.connections.forEach(c => {
                     c.lines.forEach(l => {
                         LINES.remove(l)
@@ -176,15 +188,18 @@ class NODE {
         })
         document.addEventListener("dblclick", e => {
             let mouseX = e.clientX - RECT.left, mouseY = e.clientY - RECT.top
-            if (mouseX >= this.x && mouseY >= this.y && mouseX <= this.x + this.width && mouseY <= this.y + this.height) {
+            if (ctx.isPointInPath(this.PATH2D, mouseX, mouseY)) {
                 if (this.type == "start" || this.type == "stop") return
-                edit = document.createElement("input")
+                edit = document.createElement("textarea")
                 edit.classList.add("edit")
                 edit.style.top = this.y + PADDING / 2 - 5 + "px"
-                edit.style.left = this.x + PADDING / 2 - 5 + "px"
-                edit.style.width = this.width - PADDING + "px"
+                edit.style.left = this.x + "px"
+                edit.style.width = this.width - 5 + "px"
+                edit.style.height = this.height - PADDING + "px"
                 edit.addEventListener("focusout", e => {
                     this.updateText(!!edit.value ? edit.value : this.text);
+                    this.xCenter = (this.x * 2 + this.width) / 2
+                    this.connections.forEach(c => c.update())
                     document.getElementsByClassName("edit")[0].remove()
                 })
                 document.body.appendChild(edit)
@@ -200,7 +215,7 @@ class NODE {
         }
         document.addEventListener("mousedown", e => {
             let mouseX = e.clientX - RECT.left, mouseY = e.clientY - RECT.top
-            if (mouseX >= this.x && mouseY >= this.y && mouseX <= this.x + this.width && mouseY <= this.y + this.height) {
+            if (ctx.isPointInPath(this.PATH2D, mouseX, mouseY)) {
                 currentDrag = this
                 document.addEventListener("mousemove", listener, false)
             }
@@ -212,17 +227,44 @@ class NODE {
 
     updateText(text) {
         this.text = text
+        let lines = text.split('\n');
         const txtWidth = ctx.measureText(text).width > 50 ? ctx.measureText(text).width : 50
         this.width = txtWidth + PADDING;
+        this.height = TXTHEIGHT * lines.length + PADDING;
+    }
+    resetConnections() {
+        this.connections = []
+        switch (this.type) {
+            case "start":
+                this.connections = [
+                    new Connection(this.xCenter, this.y + this.height, "output", this)]
+                break
+            case "stop":
+                this.connections = [
+                    new Connection(this.xCenter, this.y, "input", this)]
+                break
+            case "calc":
+            case "text":
+                this.connections = [
+                    new Connection(this.xCenter, this.y + this.height, "output", this),
+                    new Connection(this.xCenter, this.y, "input", this)]
+                break
+            case "logic":
+                this.connections = [
+                    new Connection(this.xCenter, this.y, "input", this),
+                    new Connection(this.x, this.yCenter, "output", this),
+                    new Connection(this.x + this.width, this.yCenter, "output", this)]
+                break
+        }
     }
 
     draw() {
         ctx.textBaseline = "middle";
         ctx.textAlign = "center";
         if (this.type == "start" || this.type == "stop")
-            drawStartStopNode(this.x, this.y, this.type.toUpperCase())
+            this.PATH2D = drawStartStopNode(this.x, this.y, this.type.toUpperCase())
         else
-            this.TYPES[this.type](this.x, this.y, this.text)
+            this.PATH2D = this.TYPES[this.type](this.x, this.y, this.text)
         this.connections.forEach(e => e.draw())
     }
 }
@@ -238,6 +280,7 @@ document.addEventListener("mousemove", e => {
     GmouseX = e.clientX - RECT.left
     GmouseY = e.clientY - RECT.top
 })
+
 document.addEventListener("keypress", e => {
     switch (e.key) {
         case "1": new NODE("start", GmouseX, GmouseY); break
@@ -266,65 +309,72 @@ function getDistance(x1, y1, x2, y2) {
 }
 // DRAWING FUNCTIONS
 function drawCalcNode(x, y, text) {
+    const PATH2D = new Path2D()
+    let lines = text.split('\n');
     ctx.font = `${TXTHEIGHT}px serif`
     const txtWidth = ctx.measureText(text).width > 50 ? ctx.measureText(text).width : 50
-    ctx.beginPath();
-    ctx.rect(x, y, txtWidth + PADDING, TXTHEIGHT + PADDING)
+    PATH2D.rect(x, y, txtWidth + PADDING, TXTHEIGHT * lines.length + PADDING)
     ctx.fillStyle = "white"
-    ctx.fill()
-    ctx.stroke();
+    ctx.fill(PATH2D)
+    ctx.stroke(PATH2D);
     ctx.fillStyle = "black"
-    ctx.fillText(text, x + ((txtWidth + PADDING) / 2), y + ((TXTHEIGHT + PADDING) / 2))
+    for (let i = 0; i < lines.length; i++)
+        ctx.fillText(lines[i], x + ((txtWidth + PADDING) / 2), y + ((TXTHEIGHT + PADDING) / 2 + TXTHEIGHT * i))
+    return PATH2D
 }
 
 function drawTextNode(x, y, text) {
-    const txtHeight = 12
+    const PATH2D = new Path2D()
     const OFFSET = 10
-    ctx.font = `${txtHeight}px serif`
+    let lines = text.split('\n');
+    ctx.font = `${TXTHEIGHT}px serif`
     const txtWidth = ctx.measureText(text).width > 50 ? ctx.measureText(text).width : 50
-    ctx.beginPath();
-    ctx.moveTo(x + OFFSET, y)
-    ctx.lineTo(x + OFFSET + txtWidth + PADDING, y)
-    ctx.lineTo(x - OFFSET + txtWidth + PADDING, y + txtHeight + PADDING)
-    ctx.lineTo(x - OFFSET, y + txtHeight + PADDING)
-    ctx.lineTo(x + OFFSET, y)
+    PATH2D.moveTo(x + OFFSET, y)
+    PATH2D.lineTo(x + OFFSET + txtWidth + PADDING, y)
+    PATH2D.lineTo(x - OFFSET + txtWidth + PADDING, y + TXTHEIGHT * lines.length + PADDING)
+    PATH2D.lineTo(x - OFFSET, y + TXTHEIGHT * lines.length + PADDING)
+    PATH2D.closePath()
     ctx.fillStyle = "white"
-    ctx.fill()
-    ctx.stroke();
+    ctx.fill(PATH2D)
+    ctx.stroke(PATH2D);
     ctx.fillStyle = "black"
-    ctx.fillText(text, x + ((txtWidth + PADDING) / 2), y + ((txtHeight + PADDING) / 2))
+    for (let i = 0; i < lines.length; i++)
+        ctx.fillText(lines[i], x + ((txtWidth + PADDING) / 2), y + ((TXTHEIGHT + PADDING) / 2 + TXTHEIGHT * i))
+    return PATH2D
 }
 
 function drawLogicNode(x, y, text) {
-    const txtHeight = 12
-    ctx.font = `${txtHeight}px serif`
+    const PATH2D = new Path2D()
+    let lines = text.split('\n');
+    ctx.font = `${TXTHEIGHT}px serif`
     const txtWidth = ctx.measureText(text).width > 50 ? ctx.measureText(text).width : 50
-    ctx.beginPath();
-    ctx.moveTo((2 * x + txtWidth + PADDING) / 2, y)
-    ctx.lineTo(x + txtWidth + PADDING, (2 * y + txtHeight + PADDING) / 2)
-    ctx.lineTo((2 * x + txtWidth + PADDING) / 2, y + txtHeight + PADDING)
-    ctx.lineTo(x, (2 * y + txtHeight + PADDING) / 2)
-    ctx.lineTo((2 * x + txtWidth + PADDING) / 2, y)
+    PATH2D.moveTo((2 * x + txtWidth + PADDING) / 2, y)
+    PATH2D.lineTo(x + txtWidth + PADDING, (2 * y + TXTHEIGHT * lines.length + PADDING) / 2)
+    PATH2D.lineTo((2 * x + txtWidth + PADDING) / 2, y + TXTHEIGHT * lines.length + PADDING)
+    PATH2D.lineTo(x, (2 * y + TXTHEIGHT * lines.length + PADDING) / 2)
+    PATH2D.closePath()
     ctx.fillStyle = "white"
-    ctx.fill()
-    ctx.stroke();
+    ctx.fill(PATH2D)
+    ctx.stroke(PATH2D);
     ctx.fillStyle = "black"
-    ctx.fillText(text, x + ((txtWidth + PADDING) / 2), y + ((txtHeight + PADDING) / 2))
-    ctx.fillText("T", x, y + ((txtHeight + PADDING) / 2) - 10)
-    ctx.fillText("N", x + txtWidth + PADDING, y + ((txtHeight + PADDING) / 2 - 10))
+    for (let i = 0; i < lines.length; i++)
+        ctx.fillText(lines[i], x + ((txtWidth + PADDING) / 2), y + ((TXTHEIGHT + PADDING) / 2 + TXTHEIGHT * i))
+    ctx.fillText("T", x, y + ((TXTHEIGHT + PADDING) / 2) - 10)
+    ctx.fillText("N", x + txtWidth + PADDING, y + ((TXTHEIGHT + PADDING) / 2 - 10))
+    return PATH2D
 }
 
 function drawStartStopNode(x, y, text = "START") {
-    const txtHeight = 12
-    ctx.font = `${txtHeight}px serif`
+    const PATH2D = new Path2D()
+    ctx.font = `${TXTHEIGHT}px serif`
     const txtWidth = ctx.measureText(text).width > 50 ? ctx.measureText(text).width : 50
-    ctx.beginPath();
-    ctx.roundRect(x, y, txtWidth + PADDING, txtHeight + PADDING, 50)
+    PATH2D.roundRect(x, y, txtWidth + PADDING, TXTHEIGHT + PADDING, 50)
     ctx.fillStyle = "white"
-    ctx.fill()
-    ctx.stroke();
+    ctx.fill(PATH2D)
+    ctx.stroke(PATH2D);
     ctx.fillStyle = "black"
-    ctx.fillText(text, x + ((txtWidth + PADDING) / 2), y + ((txtHeight + PADDING) / 2))
+    ctx.fillText(text, x + ((txtWidth + PADDING) / 2), y + ((TXTHEIGHT + PADDING) / 2))
+    return PATH2D
 }
 
 function drawLine(x1, y1, x2, y2, type = "default") {
