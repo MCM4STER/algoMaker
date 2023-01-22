@@ -4,7 +4,14 @@ body {
     overflow: hidden;
 }
 
-.edit{
+.edit {
     position: absolute;
+    z-index: 9999;
+}
+
+#r {
+    position: absolute;
+    top: 10px;
+    left: 100px;
     z-index: 9999;
 }

@@ -196,6 +196,7 @@ class NODE {
                 edit.style.left = this.x + "px"
                 edit.style.width = this.width - 5 + "px"
                 edit.style.height = this.height - PADDING + "px"
+                edit.value = this.text
                 edit.addEventListener("focusout", e => {
                     this.updateText(!!edit.value ? edit.value : this.text);
                     this.xCenter = (this.x * 2 + this.width) / 2
@@ -280,6 +281,8 @@ document.addEventListener("mousemove", e => {
     GmouseX = e.clientX - RECT.left
     GmouseY = e.clientY - RECT.top
 })
+let scale = 1
+
 
 document.addEventListener("keypress", e => {
     switch (e.key) {
@@ -311,9 +314,9 @@ function getDistance(x1, y1, x2, y2) {
 function drawCalcNode(x, y, text) {
     const PATH2D = new Path2D()
     let lines = text.split('\n');
-    ctx.font = `${TXTHEIGHT}px serif`
-    const txtWidth = ctx.measureText(text).width > 50 ? ctx.measureText(text).width : 50
-    PATH2D.rect(x, y, txtWidth + PADDING, TXTHEIGHT * lines.length + PADDING)
+    ctx.font = `${TXTHEIGHT * scale}px serif`
+    const txtWidth = ctx.measureText(text).width > 50 * scale ? ctx.measureText(text).width : 50 * scale
+    PATH2D.rect(x, y, (txtWidth + PADDING) * scale, (TXTHEIGHT * lines.length + PADDING) * scale)
     ctx.fillStyle = "white"
     ctx.fill(PATH2D)
     ctx.stroke(PATH2D);
@@ -327,53 +330,53 @@ function drawTextNode(x, y, text) {
     const PATH2D = new Path2D()
     const OFFSET = 10
     let lines = text.split('\n');
-    ctx.font = `${TXTHEIGHT}px serif`
-    const txtWidth = ctx.measureText(text).width > 50 ? ctx.measureText(text).width : 50
-    PATH2D.moveTo(x + OFFSET, y)
-    PATH2D.lineTo(x + OFFSET + txtWidth + PADDING, y)
-    PATH2D.lineTo(x - OFFSET + txtWidth + PADDING, y + TXTHEIGHT * lines.length + PADDING)
-    PATH2D.lineTo(x - OFFSET, y + TXTHEIGHT * lines.length + PADDING)
+    ctx.font = `${TXTHEIGHT * scale}px serif`
+    const txtWidth = ctx.measureText(text).width > 50 * scale ? ctx.measureText(text).width : 50 * scale
+    PATH2D.moveTo((x + OFFSET) * scale, y * scale)
+    PATH2D.lineTo((x + OFFSET + txtWidth + PADDING) * scale, y * scale)
+    PATH2D.lineTo((x - OFFSET + txtWidth + PADDING) * scale, (y + TXTHEIGHT * lines.length + PADDING) * scale)
+    PATH2D.lineTo((x - OFFSET) * scale, (y + TXTHEIGHT * lines.length + PADDING) * scale)
     PATH2D.closePath()
     ctx.fillStyle = "white"
     ctx.fill(PATH2D)
     ctx.stroke(PATH2D);
     ctx.fillStyle = "black"
     for (let i = 0; i < lines.length; i++)
-        ctx.fillText(lines[i], x + ((txtWidth + PADDING) / 2), y + ((TXTHEIGHT + PADDING) / 2 + TXTHEIGHT * i))
+        ctx.fillText(lines[i], x * scale + ((txtWidth + PADDING) * scale / 2), y * scale + ((TXTHEIGHT + PADDING) * scale / 2 + TXTHEIGHT * i))
     return PATH2D
 }
 
 function drawLogicNode(x, y, text) {
     const PATH2D = new Path2D()
     let lines = text.split('\n');
-    ctx.font = `${TXTHEIGHT}px serif`
-    const txtWidth = ctx.measureText(text).width > 50 ? ctx.measureText(text).width : 50
-    PATH2D.moveTo((2 * x + txtWidth + PADDING) / 2, y)
-    PATH2D.lineTo(x + txtWidth + PADDING, (2 * y + TXTHEIGHT * lines.length + PADDING) / 2)
-    PATH2D.lineTo((2 * x + txtWidth + PADDING) / 2, y + TXTHEIGHT * lines.length + PADDING)
-    PATH2D.lineTo(x, (2 * y + TXTHEIGHT * lines.length + PADDING) / 2)
+    ctx.font = `${TXTHEIGHT * scale}px serif`
+    const txtWidth = ctx.measureText(text).width > 50 * scale ? ctx.measureText(text).width : 50 * scale
+    PATH2D.moveTo((2 * x + txtWidth + PADDING) * scale / 2, y * scale)
+    PATH2D.lineTo((x + txtWidth + PADDING) * scale, (2 * y + TXTHEIGHT * lines.length + PADDING) * scale / 2)
+    PATH2D.lineTo((2 * x + txtWidth + PADDING) * scale / 2, (y + TXTHEIGHT * lines.length + PADDING) * scale)
+    PATH2D.lineTo(x * scale, (2 * y + TXTHEIGHT * lines.length + PADDING) * scale / 2)
     PATH2D.closePath()
     ctx.fillStyle = "white"
     ctx.fill(PATH2D)
     ctx.stroke(PATH2D);
     ctx.fillStyle = "black"
     for (let i = 0; i < lines.length; i++)
-        ctx.fillText(lines[i], x + ((txtWidth + PADDING) / 2), y + ((TXTHEIGHT + PADDING) / 2 + TXTHEIGHT * i))
-    ctx.fillText("T", x, y + ((TXTHEIGHT + PADDING) / 2) - 10)
-    ctx.fillText("N", x + txtWidth + PADDING, y + ((TXTHEIGHT + PADDING) / 2 - 10))
+        ctx.fillText(lines[i], x * scale + ((txtWidth + PADDING) * scale / 2), y * scale + ((TXTHEIGHT + PADDING) * scale / 2 + TXTHEIGHT * i))
+    ctx.fillText("T", x * scale, y * scale + ((TXTHEIGHT + PADDING) * scale / 2) - 10 * scale)
+    ctx.fillText("N", (x + txtWidth + PADDING) * scale, y * scale + ((TXTHEIGHT + PADDING) * scale / 2 - 10 * scale))
     return PATH2D
 }
 
 function drawStartStopNode(x, y, text = "START") {
     const PATH2D = new Path2D()
-    ctx.font = `${TXTHEIGHT}px serif`
-    const txtWidth = ctx.measureText(text).width > 50 ? ctx.measureText(text).width : 50
-    PATH2D.roundRect(x, y, txtWidth + PADDING, TXTHEIGHT + PADDING, 50)
+    ctx.font = `${TXTHEIGHT * scale}px serif`
+    const txtWidth = ctx.measureText(text).width > 50 * scale ? ctx.measureText(text).width : 50 * scale
+    PATH2D.roundRect(x * scale, y * scale, (txtWidth + PADDING) * scale, (TXTHEIGHT + PADDING) * scale, 50)
     ctx.fillStyle = "white"
     ctx.fill(PATH2D)
     ctx.stroke(PATH2D);
     ctx.fillStyle = "black"
-    ctx.fillText(text, x + ((txtWidth + PADDING) / 2), y + ((TXTHEIGHT + PADDING) / 2))
+    ctx.fillText(text, x * scale + ((txtWidth + PADDING) * scale / 2), y * scale + ((TXTHEIGHT + PADDING) * scale / 2))
     return PATH2D
 }
 
